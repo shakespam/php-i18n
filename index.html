@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>i18n tool</title>
+	<meta charset="utf-8">
+	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css">
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.2/jquery.min.js"></script>
+	<style type="text/css">
+		textarea {
+			resize: vertical;
+		}
+		ul {
+			padding: 0;
+			margin: 0;
+			list-style: none;
+		}
+		.dragTarget {
+			background-color: #fff;
+			border: 2px gray dashed;
+			border-radius: 8px;
+			width: 100%;
+			height: 300px;
+			color: #000;
+			padding-top: 126px;
+			text-align: center;
+			font-size: 28px;
+			font-family: verdana;
+			transition: all .4s ease;
+		}
+		.dragTarget.hover {
+			background-color: #F9AC6B;
+			border-color: #000;
+		}
+		.dragTarget.activated {
+			padding-top: 2px;
+			font-size: 16px;
+			height: 32px;
+		}
+		span.cFile {
+			font-weight: bold;
+		}
+		#out {
+			opacity: 0;
+			margin-top: 15px;
+			transition: opacity 1s ease;
+		}
+		#matches {
+			max-height: 300px;
+			overflow: scroll;
+		}
+		#matches label {
+			font-weight: normal;
+		}
+		#matches .form-control {
+			display: inline-block;
+			width: 140px;
+		}
+	</style>
+	<script type="text/javascript">
+		// process fCnt input
+		function genLang(){
+			var i = 0,
+				inp = $('#fCnt').val(),
+				$ul = $('#matches ul'),
+				//rexp = /<([\w]+)[^>]*>(.*?)<\/\1>/i;
+				match = null,
+				rexp = /<([\w]+)[^>]*>(.*?)<\/\1>/gi;
+
+			while ((match = rexp.exec(inp)) !== null){
+				$('<li>')
+					.append(
+						$('<input>')
+							.prop({
+								type: 'checkbox',
+								id: 'proc_'+i,
+								checked: true
+							})
+					)
+					.append(
+						$('<input>')
+							.prop({
+								type: 'text',
+								id: 'vname_'+i,
+								value: getVarname(match[2])
+							})//.val(getVarname(match[2]))
+								.addClass('form-control')
+								.hover(function(){
+									$(this).css('width', '350px');
+								}, function(){
+									$(this).css('width', '');
+								})
+					)
+					.append(
+						$('<label>')
+							.prop('for', 'proc_'+i)
+							.text(match[2])
+					)
+					.data('match', match)
+					.hover(function(){
+						var match = $(this).css('background-color', '#FFE1BA').data('match');
+						var elm = $('#fCnt').focus().get(0);
+						if (elm.selectionStart){
+							elm.selectionStart = match.index;
+							elm.selectionEnd = elm.selectionStart + match[0].length;
+						}
+					}, function(){
+						$(this).css('background-color', '#fff');
+					})
+					.appendTo($ul);
+				i++;
+				//alert('found match');
+			}
+		}
+
+		// replace all non-alphabetic characters with underscore
+		function sane(text){
+			return text.replace(/[^a-z]+/gi, '_');
+		}
+
+		// replace all tags with their content
+		function notags(text){
+			return text.replace(/<([\w]+)[^>]*>(.*?)<\/\1>/g, function(a,b,c){return c;});
+		}
+
+		// prepare variable name
+		function getVarname(text){
+			return sane(notags(text)).toLowerCase().substr(0, 40);
+		}
+
+		// process language
+		function replaceLang(){
+			var i = 0,
+				out = '',
+				inp = $('#fCnt').val(),
+				prefix = $('#prefix').val(),
+				rexp = /<([\w]+)[^>]*>(.*?)<\/\1>/g;
+
+			var fin = inp.replace(rexp, function(match,tag,text,offset){
+				var proc = $('#proc_'+i).prop('checked');
+				if (!proc) {
+					i++;
+					return match;
+				}
+
+				var varname = $('#vname_'+i).val(),
+					call = '<?=lang(\'' + prefix + varname + '\');?>',
+					tmp = match.replace(text, call);
+
+				out += '$lang[\''+prefix+varname+'\'] = \''+text.replace(/\'/g, '\\\'')+'\';\n';
+				i++;
+				return tmp;
+			});
+
+			$('#lOut').val(out);
+			$('#fOut').val(fin);
+		}
+
+		// reader onload callback
+		function readDone(ev){
+			$('#fCnt').val(ev.target.result);
+			genLang();
+		}
+
+		// dragover, dragleave callback
+		function dragHover(ev){
+			ev.stopPropagation();
+			ev.preventDefault();
+			if (ev.type == 'dragover') $(ev.target).addClass('hover')
+				else $(ev.target).removeClass('hover');
+		}
+
+		// drop callback
+		function dragDrop(ev){
+			ev.stopPropagation();
+			ev.preventDefault();
+			dragHover(ev);
+			var fList = ev.dataTransfer.files;
+			if (fList.length < 1) return false;
+			$(ev.target).addClass('activated');
+			$('.cFile').text(fList[0].name);
+			$('#fCnt').val('Reading file...');
+			$('#lOut, #fOut').val('');
+			$('#matches li').remove();
+			$('#prefix').val(sane(fList[0].name.substr(0, fList[0].name.lastIndexOf('.')))+'_');
+			$('#out').css('opacity', 1);
+			var reader = new FileReader;
+			reader.onload = readDone;
+			reader.readAsText(fList[0]);
+		}
+
+		$(document).ready(function(){
+			// register drag'n'drop target
+			var elm = $('.dragTarget').get(0);
+			elm.addEventListener('dragover', dragHover, false);
+			elm.addEventListener('dragleave', dragHover, false);
+			elm.addEventListener('drop', dragDrop, false);
+			$('#btnReplace').click(function(){
+				replaceLang();
+			});
+		});
+	</script>
+</head>
+<body>
+
+<div class="container">
+	<p>
+		<h1>php file i18n tool</h1>
+	</p>
+	<div class="dragTarget">
+		Drop file here!
+	</div>
+	<div id="out">
+		<p>Current file: <span class="cFile"></span></p>
+		<textarea id="fCnt" class="form-control" rows="4"></textarea>
+		<p>Text blocks</p>
+		<div id="matches" class="form-control" style="height: auto">
+			<ul>
+			</ul>
+			<div>
+				<input type="text" id="prefix" class="form-control">
+				<label for="prefix">Variable Prefix</label>
+				<span class="btn btn-default" id="btnReplace">Replace checked</span>
+			</div>
+		</div>
+		<p>Output _lang.php file</p>
+		<textarea id="lOut" class="form-control" rows="6"></textarea>
+		<p>Output <span class="cFile"></span> file</p>
+		<textarea id="fOut" class="form-control" rows="6"></textarea>
+	</div>
+</div>
+
+</body>
+</html>
