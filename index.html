@@ -58,13 +58,14 @@
 	</style>
 	<script type="text/javascript">
 		// process fCnt input
+		var regexPat = /<([\w]+?)[^>]*>([^<>]+)<\/\1>/g; // /<([\w]+?)[^>]*>([^<>]+)<\/\1>/g; - so far the best one
 		function genLang(){
 			var i = 0,
 				inp = $('#fCnt').val(),
 				$ul = $('#matches ul'),
 				//rexp = /<([\w]+)[^>]*>(.*?)<\/\1>/i;
 				match = null,
-				rexp = /<([\w]+)[^>]*>(.*?)<\/\1>/gi;
+				rexp = regexPat;
 
 			while ((match = rexp.exec(inp)) !== null){
 				$('<li>')
@@ -74,6 +75,14 @@
 								type: 'checkbox',
 								id: 'proc_'+i,
 								checked: true
+							})
+					)
+					.append(
+						$('<input>')
+							.prop({
+								type: 'checkbox',
+								id: 'fmt_'+i,
+								checked: false
 							})
 					)
 					.append(
@@ -133,7 +142,7 @@
 				out = '',
 				inp = $('#fCnt').val(),
 				prefix = $('#prefix').val(),
-				rexp = /<([\w]+)[^>]*>(.*?)<\/\1>/g;
+				rexp = regexPat;
 
 			var fin = inp.replace(rexp, function(match,tag,text,offset){
 				var proc = $('#proc_'+i).prop('checked');
@@ -143,7 +152,8 @@
 				}
 
 				var varname = $('#vname_'+i).val(),
-					call = '<?=lang(\'' + prefix + varname + '\');?>',
+					dofmt = $('#fmt_'+i).prop('checked') == true,
+					call = dofmt ? '<?=sprintf(lang(\'' + prefix + varname + '\'), \'\');?>' : '<?=lang(\'' + prefix + varname + '\');?>',
 					tmp = match.replace(text, call);
 
 				out += '$lang[\''+prefix+varname+'\'] = \''+text.replace(/\'/g, '\\\'')+'\';\n';
@@ -151,7 +161,7 @@
 				return tmp;
 			});
 
-			$('#lOut').val(out);
+			$('#lOut').val('<?php\ndefined(\'BASEPATH\') OR exit(\'No direct script access allowed\');\n\n' + out);
 			$('#fOut').val(fin);
 		}
 
