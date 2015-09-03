@@ -58,7 +58,11 @@
 	</style>
 	<script type="text/javascript">
 		// process fCnt input
-		var regexPat = /<([\w]+?)[^>]*>([^<>]+)<\/\1>/g; // /<([\w]+?)[^>]*>([^<>]+)<\/\1>/g; - so far the best one
+		var regexPatGreedy = /<([\w]+?)[^>]*>(.+)<\/\1>/g, // /<([\w]+?)[^>]*>([^<>]+)<\/\1>/g; - so far the best one
+			regexPatNonGreedy = /<([\w]+?)[^>]*>([^<>]+)<\/\1>/g,
+			regexPatPlaceholder = /(placeholder)="([^"]+)"/g,
+			regexPatValue = /(value)="([^"]+)"/g,
+			regexPat = regexPatNonGreedy;
 		function genLang(){
 			var i = 0,
 				inp = $('#fCnt').val(),
@@ -67,6 +71,7 @@
 				match = null,
 				rexp = regexPat;
 
+			$('#matches li').remove(); // clear previous results
 			while ((match = rexp.exec(inp)) !== null){
 				$('<li>')
 					.append(
@@ -133,7 +138,10 @@
 
 		// prepare variable name
 		function getVarname(text){
-			return sane(notags(text)).toLowerCase().substr(0, 40);
+			var nam = sane(notags(text)).toLowerCase().substr(0, 40);
+			while ((nam.lastIndexOf('_') == nam.length - 1) && (nam.length > 0)) // keep repeating until it ends with an underscore
+				nam = nam.substr(0, nam.length - 1) // ...shorten by one character
+			return nam;
 		}
 
 		// process language
@@ -141,8 +149,10 @@
 			var i = 0,
 				out = '',
 				inp = $('#fCnt').val(),
+				devMod = $('#devModeCheck').prop('checked'),
 				prefix = $('#prefix').val(),
-				rexp = regexPat;
+				rexp = regexPat,
+				vars = [];
 
 			var fin = inp.replace(rexp, function(match,tag,text,offset){
 				var proc = $('#proc_'+i).prop('checked');
@@ -156,7 +166,10 @@
 					call = dofmt ? '<?=sprintf(lang(\'' + prefix + varname + '\'), \'\');?>' : '<?=lang(\'' + prefix + varname + '\');?>',
 					tmp = match.replace(text, call);
 
-				out += '$lang[\''+prefix+varname+'\'] = \''+text.replace(/\'/g, '\\\'')+'\';\n';
+				if (vars.indexOf(prefix+varname) == -1) {
+					out += '$lang[\''+prefix+varname+'\'] = \''+(devMod ? prefix+varname : text.replace(/\'/g, '\\\''))+'\';\n';
+					vars.push(prefix+varname);
+				}
 				i++;
 				return tmp;
 			});
@@ -207,6 +220,30 @@
 			$('#btnReplace').click(function(){
 				replaceLang();
 			});
+			$('#btnSetPlaceholder').click(function(){
+				regexPat = regexPatPlaceholder;
+				$('.btnregex').removeClass('btn-primary').addClass('btn-default');
+				$(this).removeClass('btn-default').addClass('btn-primary');
+				genLang();
+			});
+			$('#btnSetValue').click(function(){
+				regexPat = regexPatValue;
+				$('.btnregex').removeClass('btn-primary').addClass('btn-default');
+				$(this).removeClass('btn-default').addClass('btn-primary');
+				genLang();
+			});
+			$('#btnSetGreedy').click(function(){
+				regexPat = regexPatGreedy;
+				$('.btnregex').removeClass('btn-primary').addClass('btn-default');
+				$(this).removeClass('btn-default').addClass('btn-primary');
+				genLang();
+			});
+			$('#btnSetNonGreedy').click(function(){
+				regexPat = regexPatNonGreedy;
+				$('.btnregex').removeClass('btn-primary').addClass('btn-default');
+				$(this).removeClass('btn-default').addClass('btn-primary');
+				genLang();
+			});
 		});
 	</script>
 </head>
@@ -224,12 +261,24 @@
 		<textarea id="fCnt" class="form-control" rows="4"></textarea>
 		<p>Text blocks</p>
 		<div id="matches" class="form-control" style="height: auto">
+			<div style="margin-bottom: 10px;">
+				<span class="btn btn-default btn-xs" onclick="$('#matches ul input[type=checkbox]').prop('checked', 'checked');">Tick All</span>
+				<span class="btn btn-default btn-xs" onclick="$('#matches ul input[type=checkbox]').prop('checked', '');">Untick All</span>
+				<span>&nbsp;regex:</span>
+				<span class="btn btn-default btn-xs btnregex" id="btnSetPlaceholder">Placeholders</span>
+				<span class="btn btn-default btn-xs btnregex" id="btnSetValue">Values</span>
+				<span class="btn btn-default btn-xs btnregex" id="btnSetGreedy">Set Greedy</span>
+				<span class="btn btn-primary btn-xs btnregex" id="btnSetNonGreedy">Set Non Greedy</span>
+			</div>
 			<ul>
 			</ul>
 			<div>
 				<input type="text" id="prefix" class="form-control">
 				<label for="prefix">Variable Prefix</label>
-				<span class="btn btn-default" id="btnReplace">Replace checked</span>
+				<span class="btn btn-primary" id="btnReplace">Replace checked</span>
+				<span title="Replace translate value with variable name, useful for generating ,,development'' language files, to see where are variables used in view">
+					( <input type="checkbox" id="devModeCheck" /> <label for="devModeCheck">display variable name instead</label> )
+				</span>
 			</div>
 		</div>
 		<p>Output _lang.php file</p>
